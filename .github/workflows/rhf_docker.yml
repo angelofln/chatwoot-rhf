@@ -1,0 +1,50 @@
+# RHF: gera a imagem do Chatwoot personalizado (menu, cores e logo RHF) a cada
+# push no branch `rhf` e publica em ghcr.io/<dono>/chatwoot-rhf:<sha do commit>.
+# Mesma edição da imagem oficial chatwoot/chatwoot (CW_EDITION=ee), para não
+# mudar o comportamento além do visual.
+
+name: RHF - Publicar imagem Docker
+
+on:
+  push:
+    branches:
+      - rhf
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  packages: write
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    timeout-minutes: 90
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set Chatwoot edition
+        run: echo -en '\nENV CW_EDITION="ee"' >> docker/Dockerfile
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Login to GitHub Container Registry
+        uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Build and push
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          file: docker/Dockerfile
+          platforms: linux/amd64
+          push: true
+          tags: |
+            ghcr.io/${{ github.repository_owner }}/chatwoot-rhf:${{ github.sha }}
+            ghcr.io/${{ github.repository_owner }}/chatwoot-rhf:rhf
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
